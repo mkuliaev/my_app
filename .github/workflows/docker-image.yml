@@ -15,27 +15,18 @@ env:
   CONTAINER_NAME: kuliaev-diplom-nginx
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
-
-      - name: Validate structure
-        run: |
-          if [ ! -f "Dockerfile" ]; then
-            echo "::error file=Dockerfile::Dockerfile not found!"
-            exit 1
-          fi
-          ls -la static/
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
@@ -47,27 +38,20 @@ jobs:
           context: .
           file: ./Dockerfile
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          push: ${{ github.event_name != 'pull_request' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          push: true
 
-  deploy-to-k8s:
-    needs: build-and-push
-    if: startsWith(github.ref, 'refs/tags/v')
+  deploy:
+    needs: build
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-latest
     steps:
-      - name: Setup kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: 'latest'
-
-      - name: Configure cluster access
+      - name: Configure kubeconfig
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
 
       - name: Update deployment
         run: |
@@ -75,8 +59,3 @@ jobs:
             deployment/${{ env.DEPLOYMENT_NAME }} \
             ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             --record
-
-      - name: Verify rollout
-        run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status \
-            deployment/${{ env.DEPLOYMENT_NAME }} --timeout=90s
