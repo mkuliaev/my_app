@@ -10,7 +10,7 @@ on:
 env:
   REGISTRY: docker.io
   IMAGE_NAME: mkuliaev/my-nginx-app
-  K8S_NAMESPACE: default
+  K8S_NAMESPACE: kuliaev-diplom
   DEPLOYMENT_NAME: kuliaev-diplom.ru
   CONTAINER_NAME: kuliaev-diplom-nginx
 
