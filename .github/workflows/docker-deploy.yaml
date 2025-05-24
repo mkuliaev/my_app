@@ -39,7 +39,6 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
           push: true
 
-
   deploy:
     runs-on: ubuntu-latest
     steps:
