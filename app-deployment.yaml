@@ -1,9 +1,8 @@
-# nginx-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: kuliaev-diplom.ru
-  namespace: default
+  namespace: kuliaev-diplom
   labels:
     app: web-app
 spec:
@@ -18,7 +17,7 @@ spec:
     spec:
       containers:
         - name: kuliaev-diplom-nginx
-          image:  mkuliaev/my-nginx-app:v0.2.5
+          image:  mkuliaev/my-nginx-app:latest
           resources:
              requests:
                 cpu: "1"
@@ -28,4 +27,7 @@ spec:
                 memory: "500Mi"             
           ports:
             - containerPort: 80
+
+      nodeSelector:
+        app: web-app
 
