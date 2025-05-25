@@ -2,61 +2,86 @@ name: Docker Build and Deploy
 
 on:
   push:
-    branches:
-      - main
-    tags:
-      - 'v*.*.*'
+    branches: [main]
+    tags: ['v*.*.*']  # Семантическое версионирование
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: mkuliaev/my-nginx-app
+  K8S_NAMESPACE: kuliaev-diplom
+  DEPLOYMENT_NAME: kuliaev-diplom.ru
+  CONTAINER_NAME: kuliaev-diplom-nginx
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      REGISTRY: docker.io
-      IMAGE_NAME: mkuliaev/my-nginx-app
+    outputs:
+      image_tag: ${{ steps.extract-tag.outputs.tag }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
+
+      - name: Extract version tag
+        id: extract-tag
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and Push Docker image
+      - name: Build and Push
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          push: true
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.extract-tag.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:stable
+          push: ${{ github.event_name == 'push' }}
 
   deploy:
     needs: build
-    if: github.ref_type == 'tag'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
+    environment: production
+    concurrency: production
+    
     steps:
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      - name: Set up Kubernetes context
+        uses: azure/k8s-set-context@v4
         with:
-          version: 'latest'
+          kubeconfig: ${{ secrets.KUBE_CONFIG }}
+          namespace: ${{ env.K8S_NAMESPACE }}
 
-      - name: Configure kubeconfig
+      - name: Validate cluster access
         run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
-          chmod 600 ~/.kube/config
+          kubectl auth can-i update deployments -n ${{ env.K8S_NAMESPACE }}
+          kubectl get nodes
 
-      - name: Update deployment image
+      - name: Update deployment
         run: |
-          kubectl -n default set image deployment/kuliaev-diplom.ru \
-            kuliaev-diplom-nginx=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+          kubectl set image deployment/${{ env.DEPLOYMENT_NAME }} \
+            ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.build.outputs.image_tag }} \
+            -n ${{ env.K8S_NAMESPACE }} \
             --record
+
+      - name: Verify deployment status
+        run: |
+          kubectl rollout status deployment/${{ env.DEPLOYMENT_NAME }} \
+            -n ${{ env.K8S_NAMESPACE }} \
+            --timeout=180s
+          
+          kubectl get pods -n ${{ env.K8S_NAMESPACE }} \
+            -l app=${{ env.DEPLOYMENT_NAME }} \
+            --field-selector=status.phase=Running
