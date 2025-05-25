@@ -46,7 +46,7 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'v1.28.5'  # Фиксируем версию
+          version: "v1.28.5"  # Фиксируем версию
 
       - name: Configure kubeconfig (insecure)
         run: |
@@ -68,13 +68,13 @@ jobs:
           users:
           - name: ci-admin
             user:
-              token: "${{ secrets.K8S_ADMIN_TOKEN }}"  # Используем токен из секретов
+              token: "${{ secrets.K8S_ADMIN_TOKEN }}"
           EOF
           chmod 600 ~/.kube/config
 
       - name: Verify cluster access
         run: |
-          kubectl version  # Без --short
+          kubectl version  # Без --short!
           kubectl get nodes
           kubectl -n ${{ env.K8S_NAMESPACE }} get deploy
 
