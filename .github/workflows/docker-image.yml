@@ -43,41 +43,47 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Set up kubectl (with insecure TLS)
+      - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
           version: 'v1.28.5'  # Фиксируем версию
 
-      - name: Configure insecure kubeconfig
+      - name: Configure kubeconfig (insecure)
         run: |
           mkdir -p ~/.kube
-          # Генерируем kubeconfig с отключенной проверкой TLS
           cat <<EOF > ~/.kube/config
           apiVersion: v1
           clusters:
           - cluster:
               insecure-skip-tls-verify: true
-              server: https://158.160.XXX.XXX:6443  # Ваш IP мастера
+              server: https://158.160.164.140:6443  # Замените на ваш IP мастера
             name: insecure-cluster
           contexts:
           - context:
               cluster: insecure-cluster
-              user: admin
+              user: ci-admin
             name: insecure-context
           current-context: insecure-context
           kind: Config
           users:
-          - name: admin
+          - name: ci-admin
             user:
-              token: "${{ secrets.K8S_ADMIN_TOKEN }}"  # Токен администратора
+              token: "${{ secrets.K8S_ADMIN_TOKEN }}"  # Используем токен из секретов
           EOF
           chmod 600 ~/.kube/config
 
-      - name: Run commands without TLS checks
+      - name: Verify cluster access
         run: |
-          kubectl version
+          kubectl version  # Без --short
           kubectl get nodes
           kubectl -n ${{ env.K8S_NAMESPACE }} get deploy
+
+      - name: Update deployment image
+        run: |
           kubectl -n ${{ env.K8S_NAMESPACE }} set image deploy/${{ env.DEPLOYMENT_NAME }} \
             ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deploy/${{ env.DEPLOYMENT_NAME }}
+
+      - name: Verify deployment
+        run: |
+          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deploy/${{ env.DEPLOYMENT_NAME }} --timeout=180s
+          kubectl -n ${{ env.K8S_NAMESPACE }} get pods
