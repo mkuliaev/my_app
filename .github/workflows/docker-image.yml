@@ -34,7 +34,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          push: true
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
   deploy:
     needs: build
@@ -60,11 +60,12 @@ jobs:
 
       - name: Update deployment image
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/kuliaev-diplom.ru \
-            kuliaev-diplom-nginx=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            --record --v=6
+          # Убедитесь что имя деплоймента совпадает с существующим в кластере
+          kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/your-deployment-name \
+            your-container-name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            --record
 
       - name: Verify deployment
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deployment/kuliaev-diplom.ru --timeout=180s
+          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deployment/your-deployment-name --timeout=180s
           kubectl -n ${{ env.K8S_NAMESPACE }} get pods
