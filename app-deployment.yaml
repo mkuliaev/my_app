@@ -7,6 +7,11 @@ metadata:
     app: web-app
 spec:
   replicas: 2
+  strategy:  # Добавьте стратегию обновления
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: web-app
@@ -17,15 +22,27 @@ spec:
     spec:
       containers:
         - name: kuliaev-diplom-nginx
-          image: mkuliaev/my-nginx-app:v0.2.7
+          image: mkuliaev/my-nginx-app:stable  # Используйте стабильный тег вместо конкретной версии
           resources:
             requests:
-              cpu: "1"
-              memory: "200Mi"
+              cpu: "500m"    # Уменьшите запросы для лучшего планирования
+              memory: "256Mi"
             limits:
-              cpu: "2"
-              memory: "800Mi"
+              cpu: "1"       # Снизьте лимиты, если нет нагрузки
+              memory: "512Mi"
           ports:
             - containerPort: 80
+          livenessProbe:     # Добавьте проверки здоровья
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
       nodeSelector:
-        app: web-app
+        app: web-app  # Убедитесь, что ноды worker-3 и worker-4 имеют эту метку
