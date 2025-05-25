@@ -36,3 +36,4 @@ jobs:
           mkdir -p ~/.kube
           echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
       - run: kubectl apply -f kubernetes/app-deployment.yaml
+
