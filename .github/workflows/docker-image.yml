@@ -1,71 +1,65 @@
+# .github/workflows/docker-build-and-deploy.yml
 name: Docker Build and Deploy
 
 on:
   push:
-    branches: [main]
-    tags: ['v*.*.*']
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
 
 env:
   REGISTRY: docker.io
   IMAGE_NAME: mkuliaev/my-nginx-app
   K8S_NAMESPACE: kuliaev-diplom
+  DEPLOYMENT_NAME: nginx-app
+  CONTAINER_NAME: nginx
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and Push Docker image
-        uses: docker/build-push-action@v5
+      - uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
-          push: ${{ startsWith(github.ref, 'refs/tags/v') }}
 
   deploy:
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
+      - uses: azure/setup-kubectl@v3
         with:
-          version: 'latest'
+          version: latest
 
       - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      - name: Verify cluster access
+      - name: Verify cluster
         run: |
-          kubectl cluster-info
-          kubectl get nodes
-          kubectl get deployments -n ${{ env.K8S_NAMESPACE }}
+          kubectl version --short
+          kubectl --insecure-skip-tls-verify get nodes
+          kubectl --insecure-skip-tls-verify-n ${{ env.K8S_NAMESPACE }} get deploy
 
-      - name: Update deployment image
+      - name: Update image
         run: |
-          # Убедитесь что имя деплоймента совпадает с существующим в кластере
-          kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/your-deployment-name \
-            your-container-name=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} set image \
+            deployment/${{ env.DEPLOYMENT_NAME }} \
+            ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             --record
 
-      - name: Verify deployment
+      - name: Wait for rollout
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deployment/your-deployment-name --timeout=180s
-          kubectl -n ${{ env.K8S_NAMESPACE }} get pods
+          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=180s
+          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} get pods -o wide
