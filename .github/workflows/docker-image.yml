@@ -43,33 +43,41 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - name: Set up kubectl
+      - name: Set up kubectl (with insecure TLS)
         uses: azure/setup-kubectl@v3
         with:
-          version: "v1.28.5"  # Фиксируем версию
+          version: 'v1.28.5'  # Фиксируем версию
 
-      - name: Configure kubeconfig
+      - name: Configure insecure kubeconfig
         run: |
           mkdir -p ~/.kube
-          # Если KUBE_CONFIG в base64:
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
-          # Если KUBE_CONFIG в plain text:
-          # echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          # Генерируем kubeconfig с отключенной проверкой TLS
+          cat <<EOF > ~/.kube/config
+          apiVersion: v1
+          clusters:
+          - cluster:
+              insecure-skip-tls-verify: true
+              server: https://158.160.XXX.XXX:6443  # Ваш IP мастера
+            name: insecure-cluster
+          contexts:
+          - context:
+              cluster: insecure-cluster
+              user: admin
+            name: insecure-context
+          current-context: insecure-context
+          kind: Config
+          users:
+          - name: admin
+            user:
+              token: "${{ secrets.K8S_ADMIN_TOKEN }}"  # Токен администратора
+          EOF
           chmod 600 ~/.kube/config
 
-      - name: Verify cluster access
+      - name: Run commands without TLS checks
         run: |
-          kubectl version                  # Убрали --short
-          kubectl --insecure-skip-tls-verify get nodes
-          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} get deploy  # Исправили флаг
-
-      - name: Update deployment image
-        run: |
+          kubectl version
+          kubectl get nodes
+          kubectl -n ${{ env.K8S_NAMESPACE }} get deploy
           kubectl -n ${{ env.K8S_NAMESPACE }} set image deploy/${{ env.DEPLOYMENT_NAME }} \
-            ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-            --record
-
-      - name: Verify deployment
-        run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deploy/${{ env.DEPLOYMENT_NAME }} --timeout=180s
-          kubectl -n ${{ env.K8S_NAMESPACE }} get pods
+            ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deploy/${{ env.DEPLOYMENT_NAME }}
