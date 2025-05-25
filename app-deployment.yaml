@@ -22,7 +22,7 @@ spec:
     spec:
       containers:
         - name: kuliaev-diplom-nginx
-          image: mkuliaev/my-nginx-app:stable  # Используйте стабильный тег вместо конкретной версии
+          image: mkuliaev/my-nginx-app:latest  # Используйте стабильный тег вместо конкретной версии
           resources:
             requests:
               cpu: "500m"    # Уменьшите запросы для лучшего планирования
