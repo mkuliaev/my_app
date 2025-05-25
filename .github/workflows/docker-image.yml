@@ -9,8 +9,8 @@ env:
   REGISTRY: docker.io
   IMAGE_NAME: mkuliaev/my-nginx-app
   K8S_NAMESPACE: kuliaev-diplom
-  DEPLOYMENT_NAME: nginx-app  # Добавьте переменную для имени деплоймента
-  CONTAINER_NAME: nginx       # И для имени контейнера
+  DEPLOYMENT_NAME: nginx-app
+  CONTAINER_NAME: nginx
 
 jobs:
   build:
@@ -46,34 +46,25 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'v1.28.5'  # Фиксируем версию
+          version: 'v1.28.5'  # Фиксированная версия
 
       - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          # Если KUBE_CONFIG хранится в base64:
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
-          # Если KUBE_CONFIG хранится как plain text:
-          # echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config  # Если KUBE_CONFIG не в base64
           chmod 600 ~/.kube/config
 
       - name: Verify cluster access
         run: |
-          kubectl cluster-info
-          kubectl get nodes
-          kubectl get deployments -n ${{ env.K8S_NAMESPACE }} || true  # Игнорируем ошибку если нет деплойментов
+          kubectl version  # Убрать --short
+          kubectl --insecure-skip-tls-verify get nodes
+          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} get deploy  # Исправлен синтаксис
 
       - name: Update deployment image
         run: |
-          # Проверяем существование деплоймента
-          if ! kubectl -n ${{ env.K8S_NAMESPACE }} get deployment/${{ env.DEPLOYMENT_NAME }}; then
-            echo "Deployment not found, creating..."
-            kubectl -n ${{ env.K8S_NAMESPACE }} apply -f deployment.yaml  # Укажите путь к манифесту
-          else
-            kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/${{ env.DEPLOYMENT_NAME }} \
-              ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
-              --record
-          fi
+          kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/${{ env.DEPLOYMENT_NAME }} \
+            ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
+            --record
 
       - name: Verify deployment
         run: |
