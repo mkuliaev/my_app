@@ -46,27 +46,30 @@ jobs:
       - name: Set up kubectl
         uses: azure/setup-kubectl@v3
         with:
-          version: 'v1.28.5'  # Фиксированная версия
+          version: "v1.28.5"  # Фиксируем версию
 
       - name: Configure kubeconfig
         run: |
           mkdir -p ~/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config  # Если KUBE_CONFIG не в base64
+          # Если KUBE_CONFIG в base64:
+          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > ~/.kube/config
+          # Если KUBE_CONFIG в plain text:
+          # echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
           chmod 600 ~/.kube/config
 
       - name: Verify cluster access
         run: |
-          kubectl version  # Убрать --short
+          kubectl version                  # Убрали --short
           kubectl --insecure-skip-tls-verify get nodes
-          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} get deploy  # Исправлен синтаксис
+          kubectl --insecure-skip-tls-verify -n ${{ env.K8S_NAMESPACE }} get deploy  # Исправили флаг
 
       - name: Update deployment image
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} set image deployment/${{ env.DEPLOYMENT_NAME }} \
+          kubectl -n ${{ env.K8S_NAMESPACE }} set image deploy/${{ env.DEPLOYMENT_NAME }} \
             ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }} \
             --record
 
       - name: Verify deployment
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deployment/${{ env.DEPLOYMENT_NAME }} --timeout=180s
+          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deploy/${{ env.DEPLOYMENT_NAME }} --timeout=180s
           kubectl -n ${{ env.K8S_NAMESPACE }} get pods
