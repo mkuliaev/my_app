@@ -1,48 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kuliaev-diplom.ru
+  name: nginx-app
   namespace: kuliaev-diplom
-  labels:
-    app: web-app
 spec:
-  replicas: 2
-  strategy:  # Добавьте стратегию обновления
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+  replicas: 3
   selector:
     matchLabels:
-      app: web-app
+      app: nginx
   template:
     metadata:
       labels:
-        app: web-app
+        app: nginx
     spec:
       containers:
-        - name: kuliaev-diplom-nginx
-          image: mkuliaev/my-nginx-app:latest  # Используйте стабильный тег вместо конкретной версии
-          resources:
-            requests:
-              cpu: "500m"    # Уменьшите запросы для лучшего планирования
-              memory: "256Mi"
-            limits:
-              cpu: "1"       # Снизьте лимиты, если нет нагрузки
-              memory: "512Mi"
-          ports:
-            - containerPort: 80
-          livenessProbe:     # Добавьте проверки здоровья
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 15
-            periodSeconds: 20
-          readinessProbe:
-            httpGet:
-              path: /
-              port: 80
-            initialDelaySeconds: 5
-            periodSeconds: 10
-      nodeSelector:
-        app: web-app  
+      - name: nginx
+        image: docker.io/mkuliaev/my-nginx-app:v0.4.4
+        ports:
+        - containerPort: 80
