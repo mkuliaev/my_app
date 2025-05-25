@@ -78,7 +78,6 @@ jobs:
           kubectl get nodes
           kubectl -n ${{ env.K8S_NAMESPACE }} get deploy
 
-
       - name: Update deployment image
         run: |
           kubectl -n ${{ env.K8S_NAMESPACE }} set image deploy/${{ env.DEPLOYMENT_NAME }} \
