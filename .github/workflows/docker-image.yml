@@ -76,14 +76,14 @@ jobs:
         run: |
           kubectl version
           kubectl get nodes
-          kubectl -n ${{ env.K8S_NAMESPACE }} get deploy
+          kubectl -n kuliaev-diplom get deploy
 
       - name: Update deployment image
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} set image deploy/${{ env.DEPLOYMENT_NAME }} \
-            ${{ env.CONTAINER_NAME }}=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+          kubectl -n kuliaev-diplom set image deploy/kuliaev-diplom.ru \
+            kuliaev-diplom-nginx=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
 
       - name: Verify deployment
         run: |
-          kubectl -n ${{ env.K8S_NAMESPACE }} rollout status deploy/${{ env.DEPLOYMENT_NAME }} --timeout=180s
-          kubectl -n ${{ env.K8S_NAMESPACE }} get pods
+          kubectl -n kuliaev-diplom rollout status deploy/kuliaev-diplom.ru --timeout=180s
+          kubectl -n kuliaev-diplom get pods
