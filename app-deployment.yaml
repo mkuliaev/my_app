@@ -45,4 +45,4 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
       nodeSelector:
-        app: web-app  # Убедитесь, что ноды worker-3 и worker-4 имеют эту метку
+        app: web-app  
