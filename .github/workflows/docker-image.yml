@@ -56,7 +56,7 @@ jobs:
           clusters:
           - cluster:
               insecure-skip-tls-verify: true
-              server: https://158.160.164.140:6443  # Замените на ваш IP мастера
+              server: https://158.160.164.140:6443 
             name: insecure-cluster
           contexts:
           - context:
